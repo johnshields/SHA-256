@@ -1,3 +1,9 @@
+# TOA-Labs
+.idea
+cmake-build-debug/
+CMakeLists.txt
+cmake-build-wsl_profile
+
 # Prerequisites
 *.d
 

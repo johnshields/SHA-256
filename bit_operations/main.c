@@ -11,14 +11,17 @@ void bin_print(int i) {
     // temporary variable
     int k;
 
+    // -- = unary operator
+    // >= = binary operator
     for (j--; j >= 0; j--) {
+        // ternary operator
         k = ((1 << j) & i) ? 1 : 0;
         printf("%d", k);
     }
 }
 
 int main(int argc, char *argv[]) {
-    int i = 0xf1;
+    int i = 0xf1; //11110001
 
 //    printf("Dec %\n", i);
 //    printf("Size of i: %d", sizeof(i));

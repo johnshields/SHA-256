@@ -1,10 +1,15 @@
-// John Shields
-// Bit Operations
-// Lab Tutorial - https://web.microsoftstream.com/video/9e7f870c-309e-43eb-805e-ea4e7ee719e1
+/*
+ * John Shields
+ * Bit Operations
+ *
+ * Lab Tutorials - https://web.microsoftstream.com/video/9e7f870c-309e-43eb-805e-ea4e7ee719e1
+ * https://web.microsoftstream.com/video/78e6725b-35ff-4818-b411-8eec4dea15c2?referrer=https:%2F%2Flearnonline.gmit.ie%2F
+ * https://web.microsoftstream.com/video/350c8cb1-d005-4c21-a534-c5947c7f9ef1
+*/
 
 #include <stdio.h>
 
-void bin_print(int i) {
+void bin_print(unsigned int i) {
     // number of bits in an integer
     int j = sizeof(int) * 8;
 
@@ -13,44 +18,40 @@ void bin_print(int i) {
 
     // -- = unary operator
     // >= = binary operator
+    // loop over the number of bits in i
     for (j--; j >= 0; j--) {
-        // ternary operator
+        // ternary operator - '?' - checks true and false
+        // pick out the j^th bit of i.
         k = ((1 << j) & i) ? 1 : 0;
+        // print k
         printf("%d", k);
     }
 }
 
+// standard main signature
 int main(int argc, char *argv[]) {
-    int i = 0xf1; //11110001
+    // wet i to a literal value.
+    unsigned int i = 0x0f0f0f0f;//1; // 0xf1; // 241 // 4294967295
 
-//    printf("Dec %\n", i);
-//    printf("Size of i: %d", sizeof(i));
-//    printf("Size of int: %d", sizeof(int));
-//    printf("Size of char: %d", sizeof(char));
-//
-//    char c = 41;
-//    printf("c in char is %c\n", c);
-//    printf("c in int is %d\n", c);
-//
-//    int j = 1000000000;
-//    printf("j int is %d\n", c);
-//    printf("j char is %c\n", (char) j);
-//    printf("j int from char is %d\n", (int) (char) j);
-
-//    for (unsigned  int i = 0: i <100000000000000000; i++);
-//    printf("1");
-//
-//    printf("\n");
-
-    printf("Original:  ");
+    // whats printing.
+    printf("Original:\t");
+    // Print i in binary.
     bin_print(i);
-    printf("\n");
+    printf("\t%x\t%u\n\n", i, i);
 
-    for (int j = 0; j < 40; j++) {
-        printf("%3d << %2d: ", i, j);
-        bin_print(i << j);
-        printf("\n");
+    // 32
+    int j = sizeof(unsigned int) * 8;
+
+    for (j--; j >= 0 ; j--) {
+        // 1 shifted left j times.
+        bin_print(1 << j); printf("\n");
+        // i
+        bin_print(i); printf("\n");
+        printf("-------------------------------- &\n");
+        // (1 shifted left j times) bitwise logical and i
+        bin_print((1 << j) & i); printf("\n\n");
     }
 
+    // everything is good
     return 0;
 }

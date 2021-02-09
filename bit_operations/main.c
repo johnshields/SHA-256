@@ -30,12 +30,11 @@ void bin_print(unsigned int i) {
 
 // standard main signature
 int main(int argc, char *argv[]) {
-    // wet i to a literal value.
-    unsigned int i = 0x0f0f0f0f;//1; // 0xf1; // 241 // 4294967295
+    // i to a literal value
+    unsigned int i = 0x0f0f0f0f; // 1; // 0xf1; // 241 // 4294967295
 
-    // whats printing.
     printf("Original:\t");
-    // Print i in binary.
+    // print i in binary
     bin_print(i);
     printf("\t%x\t%u\n\n", i, i);
 
@@ -43,7 +42,7 @@ int main(int argc, char *argv[]) {
     int j = sizeof(unsigned int) * 8;
 
     for (j--; j >= 0 ; j--) {
-        // 1 shifted left j times.
+        // 1 shifted left j times
         bin_print(1 << j); printf("\n");
         // i
         bin_print(i); printf("\n");

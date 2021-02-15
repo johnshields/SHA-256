@@ -6,7 +6,8 @@
 // https://www.gnu.org/software/libc/manual/html_node/Example-of-Getopt.html
 
 // Normally, getopt is called in a loop. When getopt returns -1, indicating no more options are present, the loop terminates.
-// A switch statement is used to dispatch on the return value from getopt. In typical use, each case just sets a variable that is used later in the program.
+// A switch statement is used to dispatch on the return value from getopt.
+// In typical use, each case just sets a variable that is used later in the program.
 // A second loop is used to process the remaining non-option arguments.
 
 int main(int argc, char **argv)

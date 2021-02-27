@@ -22,7 +22,6 @@ WORD Ch(WORD x, WORD y, WORD z) {
 
 // Maj(x, y,z) = (x  y)(x  z)(y  z)
 WORD Maj(WORD x, WORD y, WORD z) {
-
     return (x & y) ^ (~x & z) ^ (y & z);
 }
 
@@ -40,7 +39,6 @@ int main(int argc, char *argv[]) {
     WORD res = Maj(x, y, z);
 
     printf("Ch(%08"PF",%08"PF",%08"PF")=%08"PF"\n", x, y, z, ans);
-
     printf("Maj(%08"PF",%08"PF",%08"PF")=%08"PF"\n", x, y, z, res);
 
     return 0;

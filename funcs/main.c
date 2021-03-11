@@ -14,6 +14,7 @@
 
 #include <stdio.h>
 #include <inttypes.h>
+#include "preproc.c"
 
 #define W 32
 #define WORD uint32_t
@@ -53,6 +54,13 @@ const WORD K[] = {
         0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
 };
 
+// Preprocessing
+// Section 5.3.4 - [1]
+WORD H[] = {
+        0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+        0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
+};
+
 int main(int argc, char *argv[]) {
     printf("SHA-256\n");
 
@@ -79,7 +87,7 @@ int main(int argc, char *argv[]) {
     printf("Sig0(%08" PF " -> %08" PF "\n", x, Sig0(x));
     printf("Sig1(%08" PF " -> %08" PF "\n", x, Sig1(x));
 
-    printf("K[0] = %08" PF "\tK[63] = %08" PF "\n", K[0], K[63]);
+    printf("K[0] = %08" PF "\n K[63] = %08" PF "\n", K[0], K[63]);
 
     return 0;
 }

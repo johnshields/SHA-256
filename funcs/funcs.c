@@ -61,7 +61,7 @@ WORD H[] = {
         0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
 };
 
-int main(int argc, char *argv[]) {
+int pMain(int argc, char *argv[]) {
     printf("SHA-256\n");
 
     // x picks out the 1s and 0s from the corresponding position

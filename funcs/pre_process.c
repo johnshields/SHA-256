@@ -13,21 +13,21 @@ union Block {
 };
 
 enum Status {
-    READ, PAD0, PAD1, END
+    READ, PAD, PAD0, PAD1, END
 };
 
 // get next Block.
 int next_block(FILE *f, union Block *B, enum Status *S, uint64_t *num_of_bits) {
-
     // number of bytes read.
     size_t num_of_bytes;
 
-    if (*S == READ) {
+    if (*S == END) {
+        return 0;
+    } else if (*S == READ) {
         // try to read 64 bytes.
         num_of_bytes = fread(B->bytes, 1, 64, f);
         // calculate the total bits read so far.
         *num_of_bits = *num_of_bits + (8 * num_of_bytes);
-        printf("Read %zu bytes.\n", num_of_bytes);
         // enough room for padding.
         if (num_of_bytes == 64) {
             return 1;
@@ -36,29 +36,39 @@ int next_block(FILE *f, union Block *B, enum Status *S, uint64_t *num_of_bits) {
             B->bytes[num_of_bytes] = 0x80; // In bits: 1000000
             // append enough 0 bits, leaving 64 at the end.
             while (num_of_bytes++ < 56) {
-                B->bytes[num_of_bytes] = 0x00; // In bits: 000000
+                B->bytes[num_of_bytes] = 0x00; // In bits: 0000000
             }
             // append length of original input.
-            B->sixF[7] = (uint64_t) num_of_bits;
+            B->sixF[7] = *num_of_bits;
             // last block.
             *S = END;
         } else {
             // gotten to the end of the input message.
-            // not enough room in the black fo all padding
+            // not enough room in the black fo all padding.
             // append a 1 bit (and seven 0 bits to make a full byte)
             B->bytes[num_of_bytes] = 0x80;
             // append 0 bits.
             while (num_of_bytes++ < 64) {
-                B->bytes[num_of_bytes] = 0x00; // In bits: 000000
+                B->bytes[num_of_bytes] = 0x00; // In bits: 0000000
             }
             // change the status to PAD
+            *S = PAD;
         }
+    } else if (*S == PAD) {
+        num_of_bytes = 0;
+        // append 0 bits.
+        while (num_of_bytes++ < 56) {
+            B->bytes[num_of_bytes] = 0x00; // In bits: 0000000
+        }
+        // append num of bits as a integer.
+        B->sixF[7] = *num_of_bits;
+        // change the status to END
+        *S = END;
     }
     return 1;
 }
 
 int main(int argc, char *argv[]) {
-
     // Iterator
     int i;
     // current block.

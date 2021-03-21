@@ -80,7 +80,11 @@ int main(int argc, char *argv[]) {
     // File pointer for reading.
     FILE *f;
     // Open file from cli for reading.
-    f = fopen(argv[1], "r");
+    if (!(f = fopen(argv[1], "r")) )
+    {
+       printf("Not able to read file");
+       return 1;
+    }
 
     // loop through the pre-processed Blocks
     while (next_block(f, &B, &S, &num_of_bits)) {

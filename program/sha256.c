@@ -14,27 +14,44 @@
 
 #include <stdio.h>
 #include <inttypes.h>
-#include "pre_process.c"
 
-#define W 32
+// Words and bytes.
 #define WORD uint32_t
-#define PF PRIX32
+#define PF PRIx32
+#define BYTE uint8_t
 
 // Page 5 of the secure hash standard. [1]
-#define ROTL(x, n) (x<<n) | (x>>(W-n))
-#define ROTR(x, n) (x>>n) | (x<<(W-n))
-#define SHR(x, n) x>>n
+#define ROTL(_x,_n) (_x << _n) | (_x >> ((sizeof(_x)*8) - _n))
+#define ROTR(_x,_n) (_x >> _n) | (_x << ((sizeof(_x)*8) - _n))
+#define SHR(_x,_n) _x >> _n
 
 // Page 10 of the secure hash standard. [1]
-#define CH(x, y, z) (x & y) ^ (~x & z)
-#define MAJ(x, y, z) (x & y) ^ (x & z) ^ (y & z)
+#define CH(_x,_y,_z) (_x & _y) ^ (~_x & _z)
+#define MAJ(_x,_y,_z) (_x & _y) ^ (_x & _z) ^ (_y & _z)
 
-#define SIG0(x) ROTR(x, 2) ^ ROTR(x, 13) ^ ROTR(x, 22)
-#define SIG1(x) ROTR(x, 6) ^ ROTR(x, 11) ^ ROTR(x, 25)
-#define Sig0(x) ROTR(x, 7) ^ ROTR(x, 18) ^ SHR(x, 22)
-#define Sig1(x) ROTR(x, 17) ^ ROTR(x, 19) ^ SHR(x, 10)
+#define SIG0(_x) ROTR(_x,2)  ^ ROTR(_x,13) ^ ROTR(_x,22)
+#define SIG1(_x) ROTR(_x,6)  ^ ROTR(_x,11) ^ ROTR(_x,25)
+#define Sig0(_x) ROTR(_x,7)  ^ ROTR(_x,18) ^ SHR(_x,3)
+#define Sig1(_x) ROTR(_x,17) ^ ROTR(_x,19) ^ SHR(_x,10)
 
-// Page 11 of  secure hash standard. [1]
+
+
+// SHA256 works on blocks of 512 bits.
+union Block {
+    // 8 x 64 = 512 - dealing with block as bytes.
+    BYTE bytes[64];
+    // 32 x 16 = 512 - dealing with block as words.
+    WORD words[16];
+    // 64 x 8 = 512 - dealing with the last 64 bits of last block.
+    uint64_t sixF[8];
+};
+
+// For keeping track of where we are with the input message/padding.
+enum Status {
+    READ, PAD, END
+};
+
+// Page 11 - section 4.2.2 of secure hash standard. [1]
 const WORD K[] = {
         0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
         0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
@@ -54,40 +71,159 @@ const WORD K[] = {
         0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
 };
 
-// Preprocessing
-// Section 5.3.4 - [1]
-WORD H[] = {
-        0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
-        0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
-};
+// Returns 1 if it created a new block from original message or padding.
+// Returns 0 if all padded message has already been consumed.
+// get next Block.
+int next_block(FILE *f, union Block *B, enum Status *S, uint64_t *num_of_bits) {
+    // number of bytes read.
+    size_t num_of_bytes;
 
-int pMain(int argc, char *argv[]) {
-    printf("SHA-256\n");
+    if (*S == END) {
+        return 0;
+    } else if (*S == READ) {
+        // Try to read 64 bytes from the input file.
+        num_of_bytes = fread(B->bytes, 1, 64, f);
+        // Calculate the total bits read so far.
+        *num_of_bits = *num_of_bits + (8 * num_of_bytes);
+        // Enough room for padding.
+        if (num_of_bytes == 64) {
+            // This happens when we can read 64 bytes from f.
+            return 1;
+        } else if (num_of_bytes < 56) {
+            // This happens when we have enough roof for all the padding.
+            // Append a 1 bit (and seven 0 bits to make a full byte).
+            B->bytes[num_of_bytes] = 0x80; // In bits: 10000000.
+            // Append enough 0 bits, leaving 64 at the end.
+            for (num_of_bytes++; num_of_bytes < 56; num_of_bytes++) {
+                B->bytes[num_of_bytes] = 0x00; // In bits: 00000000
+            }
+            // Append length of original input - Check endianness.
+            B->sixF[7] = *num_of_bits;
+            // Say this is the last block.
+            *S = END;
+        } else {
+            // Got to the end of the input message and not enough room
+            // in this block for all padding.
+            // Append a 1 bit (and seven 0 bits to make a full byte.)
+            B->bytes[num_of_bytes] = 0x80;
+            // Append 0 bits.
+            for (num_of_bytes++; num_of_bytes < 64; num_of_bytes++) {
+                // Error: trying to write to
+                B->bytes[num_of_bytes] = 0x00; // In bits: 00000000
+            }
+            // Change the status to PAD.
+            *S = PAD;
+        }
+    } else if (*S == PAD) {
+        // Append 0 bits.
+        for (num_of_bytes = 0; num_of_bytes < 56; num_of_bytes++) {
+            B->bytes[num_of_bytes] = 0x00; // In bits: 00000000
+        }
+        // Append num_of_bits as an integer - Check endian
+        B->sixF[7] = *num_of_bits;
+        // Change the status to END.
+        *S = END;
+    }
+    return 1;
+}
 
-    // x picks out the 1s and 0s from the corresponding position
-    // where X has 0s picks out the 1s and 0s in z.
-    // Use x to choose bits from y & z and merge them together.
-    WORD x = 0xF1234567;
-    WORD y = 0x0A0A0A0A;
-    WORD z = 0xB0B0B0B0;
+int next_hash(union Block *M, WORD H[]) {
+    WORD Y = 0xffffffff;
+    // Message schedule, [1] Section 6.2.2
+    WORD W[64];
+    // Iterator.
+    int t;
+    // Temporary variables.
+    WORD a, b, c, d, e, f, g, h, T1, T2;
 
-    WORD ans;
+    // [1] Section 6.2.2, part 1.
+    for (t = 0; t < 16; t++)
+        W[t] = M->words[t];
+    for (t = 16; t < 64; t++)
+        W[t] = Sig1(W[t - 2]) + W[t - 7] + Sig0(W[t - 15]) + W[t - 16];
 
-    ans = CH(x, y, z);
-    printf("Ch(%08"PF",%08"PF",%08"PF")=%08"PF"\n", x, y, z, ans);
+    // [1] Section 6.2.2, part 2.
+    a = H[0];
+    b = H[1];
+    c = H[2];
+    d = H[3];
+    e = H[4];
+    f = H[5];
+    g = H[6];
+    h = H[7];
 
-    ans = MAJ(x, y, z);
-    printf("Maj(%08"PF",%08"PF",%08"PF")=%08"PF"\n", x, y, z, ans);
+    // [1] Section 6.2.2, part 3.
+    for (t = 0; t < 64; t++) {
+        T1 = h + SIG1(e) + CH(e, f, g) + K[t] + W[t];
+        T2 = SIG0(a) + MAJ(a, b, c);
+        h = g;
+        g = f;
+        f = e;
+        e = d + T1;
+        d = c;
+        c = b;
+        b = a;
+        a = T1 + T2;
+    }
 
-    printf("ROTL(%08" PF " -> %08" PF "\n", x, ROTL(x, 4));
-    printf("ROTR(%08" PF " -> %08" PF "\n", x, ROTR(x, 4));
-    printf("SHR(%08" PF " -> %08" PF "\n", x, SHR(x, 4));
-    printf("SIG0(%08" PF " -> %08" PF "\n", x, SIG0(x));
-    printf("SIG1(%08" PF " -> %08" PF "\n", x, SIG1(x));
-    printf("Sig0(%08" PF " -> %08" PF "\n", x, Sig0(x));
-    printf("Sig1(%08" PF " -> %08" PF "\n", x, Sig1(x));
+    // [1] Section 6.2.2, part 4.
+    H[0] = a + H[0];
+    H[1] = b + H[1];
+    H[2] = c + H[2];
+    H[3] = d + H[3];
+    H[4] = e + H[4];
+    H[5] = f + H[5];
+    H[6] = g + H[6];
+    H[7] = h + H[7];
 
-    printf("K[0] = %08" PF "\n K[63] = %08" PF "\n", K[0], K[63]);
+    return 0;
+}
+
+// The function that performs/orchestrates the SHA256 algorithm on message f.
+int sha256(FILE *f, WORD H[]) {
+    // The current block.
+    union Block M;
+
+    // Total number of bits read.
+    uint64_t num_of_bits = 0;
+
+    // Current status of reading input.
+    enum Status S = READ;
+
+    // Loop through the (preprocessed) blocks.
+    while (next_block(f, &M, &S, &num_of_bits)) {
+        next_hash(&M, H);
+    }
+
+    return 0;
+}
+
+// TODO - Command line arguments
+int main(int argc, char *argv[]) {
+    // [1] Section 5.3.4
+    WORD H[] = {
+            0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+            0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
+    };
+
+    // File pointer for reading.
+    FILE *f;
+    // Open file from command line for reading.
+    if (!(f = fopen(argv[1], "r"))) {
+        printf("Not able to read file :(");
+        return 1;
+    }
+
+    // Calculate the SHA256 of f.
+    sha256(f, H);
+
+    // Print the final SHA256 hash.
+    for (int i = 0; i < 8; i++)
+        printf("%08" PF, H[i]);
+    printf("\n");
+
+    // Close the file.
+    fclose(f);
 
     return 0;
 }

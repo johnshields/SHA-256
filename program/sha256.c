@@ -101,7 +101,7 @@ int next_block(FILE *f, union Block *M, enum Status *S, uint64_t *num_of_bits) {
                 M->bytes[num_of_bytes] = 0x00; // In bits: 00000000
             }
             // Append length of original input - Check endianness.
-            M->sixF[7] = *num_of_bits;
+            M->sixF[7] = (is_little_endian() ? bswap_64(*num_of_bits) : *num_of_bits);
             // Say this is the last block.
             *S = END;
         } else {
@@ -226,7 +226,7 @@ int main(int argc, char *argv[]) {
 
     // Open file from command line for reading.
     if (!(f = fopen(argv[1], "r"))) {
-    //if (!(f = fopen("input.txt", "w+"))) {
+//    if (!(f = fopen("input.txt", "w+"))) {
         printf("[ALERT] Not able to read file %s. \n", argv[1]);
         return 1;
     }

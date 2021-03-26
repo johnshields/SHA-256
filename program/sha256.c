@@ -5,15 +5,20 @@
  * SHA-224 and SHA-256 both use six logical functions, where each function operates on 32-bit
  * words, which are represented as x, y, and z. The result of each function is a new 32-bit word.
  *
- * https://web.microsoftstream.com/video/9d3237fb-55e9-4159-9e08-aa2e086495e5
- * https://web.microsoftstream.com/video/4584d6ab-ad5d-472a-92d3-afc0aa7a060b
+ * https://web.microsoftstream.com/video/7fed3236-f072-433f-a512-a3007da35953
  * [1] https://www.nist.gov/publications/secure-hash-standard
+ * [2] https://developer.ibm.com/technologies/systems/articles/au-endianc/
  * https://www.geeksforgeeks.org/bitwise-operators-in-c-cpp/
  * https://www.guru99.com/c-bitwise-operators.html
 */
 
 #include <stdio.h>
 #include <inttypes.h>
+#include <byteswap.h>
+
+// [2] Endianness
+const int _i = 1;
+#define is_little_endian() ((*(char*)&_i) != 0) // char = 8 bits
 
 // Words and bytes.
 #define WORD uint32_t
@@ -21,20 +26,18 @@
 #define BYTE uint8_t
 
 // Page 5 of the secure hash standard. [1]
-#define ROTL(_x,_n) (_x << _n) | (_x >> ((sizeof(_x)*8) - _n))
-#define ROTR(_x,_n) (_x >> _n) | (_x << ((sizeof(_x)*8) - _n))
-#define SHR(_x,_n) _x >> _n
+#define ROTL(_x, _n) ((_x << _n) | (_x >> ((sizeof(_x)*8) - _n)))
+#define ROTR(_x, _n) ((_x >> _n) | (_x << ((sizeof(_x)*8) - _n)))
+#define SHR(_x, _n) (_x >> _n)
 
 // Page 10 of the secure hash standard. [1]
-#define CH(_x,_y,_z) (_x & _y) ^ (~_x & _z)
-#define MAJ(_x,_y,_z) (_x & _y) ^ (_x & _z) ^ (_y & _z)
+#define CH(_x, _y, _z) ((_x & _y) ^ (~_x & _z))
+#define MAJ(_x, _y, _z) ((_x & _y) ^ (_x & _z) ^ (_y & _z))
 
-#define SIG0(_x) ROTR(_x,2)  ^ ROTR(_x,13) ^ ROTR(_x,22)
-#define SIG1(_x) ROTR(_x,6)  ^ ROTR(_x,11) ^ ROTR(_x,25)
-#define Sig0(_x) ROTR(_x,7)  ^ ROTR(_x,18) ^ SHR(_x,3)
-#define Sig1(_x) ROTR(_x,17) ^ ROTR(_x,19) ^ SHR(_x,10)
-
-
+#define SIG0(_x) (ROTR(_x,2)  ^ ROTR(_x,13) ^ ROTR(_x,22))
+#define SIG1(_x) (ROTR(_x,6)  ^ ROTR(_x,11) ^ ROTR(_x,25))
+#define Sig0(_x) (ROTR(_x,7)  ^ ROTR(_x,18) ^ SHR(_x,3))
+#define Sig1(_x) (ROTR(_x,17) ^ ROTR(_x,19) ^ SHR(_x,10))
 
 // SHA256 works on blocks of 512 bits.
 union Block {
@@ -74,7 +77,7 @@ const WORD K[] = {
 // Returns 1 if it created a new block from original message or padding.
 // Returns 0 if all padded message has already been consumed.
 // get next Block.
-int next_block(FILE *f, union Block *B, enum Status *S, uint64_t *num_of_bits) {
+int next_block(FILE *f, union Block *M, enum Status *S, uint64_t *num_of_bits) {
     // number of bytes read.
     size_t num_of_bytes;
 
@@ -82,7 +85,7 @@ int next_block(FILE *f, union Block *B, enum Status *S, uint64_t *num_of_bits) {
         return 0;
     } else if (*S == READ) {
         // Try to read 64 bytes from the input file.
-        num_of_bytes = fread(B->bytes, 1, 64, f);
+        num_of_bytes = fread(M->bytes, 1, 64, f);
         // Calculate the total bits read so far.
         *num_of_bits = *num_of_bits + (8 * num_of_bytes);
         // Enough room for padding.
@@ -92,24 +95,24 @@ int next_block(FILE *f, union Block *B, enum Status *S, uint64_t *num_of_bits) {
         } else if (num_of_bytes < 56) {
             // This happens when we have enough roof for all the padding.
             // Append a 1 bit (and seven 0 bits to make a full byte).
-            B->bytes[num_of_bytes] = 0x80; // In bits: 10000000.
+            M->bytes[num_of_bytes] = 0x80; // In bits: 10000000.
             // Append enough 0 bits, leaving 64 at the end.
             for (num_of_bytes++; num_of_bytes < 56; num_of_bytes++) {
-                B->bytes[num_of_bytes] = 0x00; // In bits: 00000000
+                M->bytes[num_of_bytes] = 0x00; // In bits: 00000000
             }
             // Append length of original input - Check endianness.
-            B->sixF[7] = *num_of_bits;
+            M->sixF[7] = *num_of_bits;
             // Say this is the last block.
             *S = END;
         } else {
             // Got to the end of the input message and not enough room
             // in this block for all padding.
             // Append a 1 bit (and seven 0 bits to make a full byte.)
-            B->bytes[num_of_bytes] = 0x80;
+            M->bytes[num_of_bytes] = 0x80;
             // Append 0 bits.
             for (num_of_bytes++; num_of_bytes < 64; num_of_bytes++) {
                 // Error: trying to write to
-                B->bytes[num_of_bytes] = 0x00; // In bits: 00000000
+                M->bytes[num_of_bytes] = 0x00; // In bits: 00000000
             }
             // Change the status to PAD.
             *S = PAD;
@@ -117,18 +120,26 @@ int next_block(FILE *f, union Block *B, enum Status *S, uint64_t *num_of_bits) {
     } else if (*S == PAD) {
         // Append 0 bits.
         for (num_of_bytes = 0; num_of_bytes < 56; num_of_bytes++) {
-            B->bytes[num_of_bytes] = 0x00; // In bits: 00000000
+            M->bytes[num_of_bytes] = 0x00; // In bits: 00000000
         }
         // Append num_of_bits as an integer - Check endian
-        B->sixF[7] = *num_of_bits;
+        //M->sixF[7] = *num_of_bits;
+        M->sixF[7] = (is_little_endian() ? bswap_64(*num_of_bits) : *num_of_bits);
         // Change the status to END.
         *S = END;
+    }
+
+    // swap the byte order of the words if is_little_endian
+    if (is_little_endian()) {
+        for (int i = 0; i < 16; i++) {
+            M->words[i] = bswap_32(M->words[i]);
+        }
     }
     return 1;
 }
 
+// designed to make it difficult to reverse the process
 int next_hash(union Block *M, WORD H[]) {
-    WORD Y = 0xffffffff;
     // Message schedule, [1] Section 6.2.2
     WORD W[64];
     // Iterator.
@@ -167,6 +178,7 @@ int next_hash(union Block *M, WORD H[]) {
     }
 
     // [1] Section 6.2.2, part 4.
+    // next hash from current message block and previous hash value
     H[0] = a + H[0];
     H[1] = b + H[1];
     H[2] = c + H[2];
@@ -194,7 +206,6 @@ int sha256(FILE *f, WORD H[]) {
     while (next_block(f, &M, &S, &num_of_bits)) {
         next_hash(&M, H);
     }
-
     return 0;
 }
 
@@ -209,7 +220,8 @@ int main(int argc, char *argv[]) {
     // File pointer for reading.
     FILE *f;
     // Open file from command line for reading.
-    if (!(f = fopen(argv[1], "r"))) {
+    //if (!(f = fopen(argv[1], "r"))) {
+    if (!(f = fopen("input.txt", "w+"))) {
         printf("Not able to read file :(");
         return 1;
     }

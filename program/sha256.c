@@ -209,7 +209,6 @@ int sha256(FILE *f, WORD H[]) {
     return 0;
 }
 
-// TODO - Command line arguments
 int main(int argc, char *argv[]) {
     // [1] Section 5.3.4
     WORD H[] = {
@@ -219,18 +218,18 @@ int main(int argc, char *argv[]) {
 
     // File pointer for reading.
     FILE *f;
+
+    if (argc != 2) {
+        printf("[ALERT] expected filename in argument \n");
+        return 1;
+    }
+
     // Open file from command line for reading.
     if (!(f = fopen(argv[1], "r"))) {
     //if (!(f = fopen("input.txt", "w+"))) {
-        printf("Not able to read file %s. \n", argv[1]);
+        printf("[ALERT] Not able to read file %s. \n", argv[1]);
         return 1;
     }
-
-    if (argc != 2) {
-        printf("expected filename");
-        return 1;
-    }
-
 
     // Calculate the SHA256 of f.
     sha256(f, H);

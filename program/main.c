@@ -10,11 +10,14 @@
  * [2] https://developer.ibm.com/technologies/systems/articles/au-endianc/
  * https://www.geeksforgeeks.org/bitwise-operators-in-c-cpp/
  * https://www.guru99.com/c-bitwise-operators.html
+ * [7] https://stackoverflow.com/questions/20076001/how-do-i-create-a-help-option-in-a-command-line-program-in-c-c
 */
 
 #include <stdio.h>
 #include <inttypes.h>
 #include <byteswap.h>
+// for --help in CLI
+#include <string.h>
 
 // [2] Endianness
 const int _i = 1;
@@ -219,19 +222,30 @@ int main(int argc, char *argv[]) {
     // File pointer for reading.
     FILE *f;
 
+     // --help in command line - [7].
+    if (argc == 2 && strcmp(argv[1], "--help")==0) {
+        printf("SHA-256 Calculator --help \n");
+        printf("\nHash a file with the program by specifying a file e.g: './main input.txt' \n");
+        printf("\nPlease make sure the file path and type is correct. \n");
+        return 0;
+    }
+
+    // Error checking to show if no file was specified in the command line argument.
     if (argc != 2) {
-        printf("[ALERT] expected filename in argument \n");
+        printf("Expected filename in argument. \n");
+        printf("\nType './main --help' for more info. \n");
         return 1;
     }
 
     // Open file from command line for reading.
     if (!(f = fopen(argv[1], "r"))) {
-//    if (!(f = fopen("input.txt", "w+"))) {
-        printf("[ALERT] Not able to read file %s. \n", argv[1]);
+        printf("Not able to read file %s \n", argv[1]);
+        printf("\nType './main --help' for more info. \n");
         return 1;
     }
 
-    // Calculate the SHA256 of f.
+    // Calculate the SHA-256 of f.
+    printf("SHA-256 hash value of %s \n\n", argv[1]);
     sha256(f, H);
 
     // Print the final SHA256 hash.
